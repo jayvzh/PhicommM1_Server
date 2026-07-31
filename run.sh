@@ -1,9 +1,7 @@
-#!/bin/bash
+#!/bin/sh
 
 # Phicomm M1 Server 启动脚本
 # 启动 TCP 数据接收服务(端口9000) 和 Flask Web 前端(端口5000)
-
-set -e
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Phicomm M1 Server..."
 
@@ -36,7 +34,8 @@ cleanup() {
     exit 0
 }
 
-trap cleanup SIGTERM SIGINT
+# 使用不带SIG前缀的信号名,兼容sh和bash
+trap cleanup TERM INT
 
 # 等待所有后台进程
 wait

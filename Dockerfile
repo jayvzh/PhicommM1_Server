@@ -14,4 +14,4 @@ EXPOSE 5000 9000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')" || exit 1
 
-CMD ["sh", "run.sh"]
+CMD ["sh", "-c", "sh run.sh"]
