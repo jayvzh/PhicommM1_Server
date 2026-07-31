@@ -41,15 +41,9 @@ services:
       - "5000:5000"   # Web前端
       - "9000:9000"   # M1设备TCP
     volumes:
-      - ./data:/app/data       # 持久化数据库
-      - ./logs:/app/logs       # 持久化日志
+      - /opt/phicomm-m1/data:/app/data       # 持久化数据库
+      - /opt/phicomm-m1/logs:/app/logs       # 持久化日志
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
-      interval: 30s
-      timeout: 5s
-      start_period: 10s
-      retries: 3
     environment:
       - TZ=Asia/Shanghai
 ```
