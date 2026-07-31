@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Project runtime files
+data.db
+data.db-wal
+data.db-shm
+logs/

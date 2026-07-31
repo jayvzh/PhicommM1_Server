@@ -1,76 +1,129 @@
-# 说明
+# Phicomm 悟空 M1 私有服务器
 
-Phicomm悟空M1官方服务器关闭,WIFI图标一直闪烁,最开始只是想写个监听9000端口的服务器,让它的WIFI图标不闪,后来写着写着就加上了把获取的数据保存到MYSQL,再后来,即然都保存到MYSQL了,干脆再写个前端吧.Python小白,代码比较乱.
+替代已停运的官方服务器，支持数据采集、历史记录、图表展示和亮度控制。
 
-###### 关于悟空M1连接WIFI,可以查看这里:[使用EasyLink让M1连接WIFI](https://mrhao.net/archives/134/)
+## 功能特性
 
-###### 修改路由器DNS自定义HOSTS
+- 📡 **数据采集**：TCP 服务监听 M1 设备实时数据（温度、湿度、PM2.5、甲醛）
+- 💾 **历史记录**：SQLite 持久化存储，自动清理过期数据
+- 📊 **图表展示**：支持温度、湿度、PM2.5、甲醛多指标切换，时间范围可选（1h/6h/24h/7d）
+- 💡 **亮度控制**：支持设备屏幕亮度调节（关/暗/标准三档）
+- 🐳 **Docker 部署**：一键 Docker Compose 部署
 
-127.0.0.1       aircat.phicomm.com
+## 架构
 
-请修改127.0.0.1为PhicommM1 Server的IP地址
+```
+M1 设备 --TCP:9000--> PhicommM1Server.py --> SQLite (data.db)
+                                              |
+Flask 前端 (端口5000) <------ app.py ----------+
+```
 
+## 快速开始（Docker Compose）
 
-# 前端截图
+### 1. 修改路由器 Hosts
 
-![image](https://github.com/fenggenet/PhicommM1_Server/blob/main/preview/M1.png)
+将 `aircat.phicomm.com` 指向服务器 IP：
 
-# 安装必要环境
+```
+<服务器IP>    aircat.phicomm.com
+```
 
-在Docker上创建Python容器,端口映射9000和5000的TCP端口,9000为M1监听端口,5000为前端访问端口.
+### 2. 启动服务
 
-然后在终端上安装下面模块:
+```bash
+git clone https://github.com/fenggenet/PhicommM1_Server.git
+cd PhicommM1_Server
+docker compose up -d
+```
 
-  `pip install Flask`
+### 3. 访问
 
-  `pip install sqlalchemy`
+- 前端页面：`http://<服务器IP>:5000`
+- 健康检查：`http://<服务器IP>:5000/api/health`
 
-  `pip install pymysql`
+## 手动部署
 
-  `pip install mysql-connector`
+### 环境要求
 
-  `pip install pytz`
+- Python 3.10+
+- Flask
+- pytz
 
-# 安装PhicommM1 Server
+### 安装依赖
 
-  `cd /usr/local`
+```bash
+pip install -r requirements.txt
+```
 
-  `git clone https://github.com/fenggenet/PhicommM1_Server.git`
+### 启动
 
-# 修改MYSQL配置
+```bash
+chmod +x run.sh
+./run.sh
+```
 
-###### 进入PhicommM1 Server目录
+## API 接口
 
-  `cd PhicommM1_Server`
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/` | GET | 前端页面 |
+| `/getdata` | GET | 获取最新传感器数据 |
+| `/api/history?hours=N` | GET | 获取最近 N 小时的历史数据 |
+| `/api/brightness` | GET | 获取当前亮度设置 |
+| `/api/brightness` | POST | 设置亮度：`{"value": 0}` (0/25/50) |
+| `/api/config` | GET | 获取系统配置 |
+| `/api/config` | POST | 更新配置：`{"retention_days": 7}` |
+| `/api/health` | GET | 健康检查 |
 
-###### 修改You MySQL Host IP为你的MYSQL服务器地址
+## 配置说明
 
-  `sed -i 's/^HOSTNAME.*\+=.*/HOSTNAME = You MySQL Host IP/' common/sql.conf`
+### 数据保留
 
-###### 修改You MySQL Host Prot为你的MYSQL服务器端口
+默认保留最近 7 天的历史数据，超过期限的数据会自动清理。可通过 API 修改：
 
-  `sed -i 's/^PORT.*\+=.*/PORT = You MySQL Host Prot/' common/sql.conf`
+```bash
+curl -X POST http://localhost:5000/api/config \
+  -H "Content-Type: application/json" \
+  -d '{"retention_days": 30}'
+```
 
-###### 修改You MySQL DataBase为你的MYSQL数据库名称
+### 亮度控制
 
-  `sed -i 's/^DATABASE.*\+=.*/DATABASE = You MySQL DataBase/' common/sql.conf`
+设备支持三档亮度：`0`（关闭）、`25`（暗）、`50`（标准）。
 
-###### 修改You MySQL UserName为你的MYSQL服务器用户名
+通过前端页面按钮或 API 控制：
 
-  `sed -i 's/^USERNAME.*\+=.*/USERNAME = You MySQL UserName/' common/sql.conf`
+```bash
+curl -X POST http://localhost:5000/api/brightness \
+  -H "Content-Type: application/json" \
+  -d '{"value": 25}'
+```
 
-###### 修改You MySQL Password为你的MYSQL服务器密码
+## 目录结构
 
-  `sed -i 's/^PASSWORD.*\+=.*/PASSWORD = You MySQL Password/' common/sql.conf`
+```
+PhicommM1_Server/
+├── PhicommM1Server.py    # TCP 数据采集服务（端口 9000）
+├── app.py                 # Flask Web 服务（端口 5000）
+├── run.sh                 # 启动脚本
+├── Dockerfile             # Docker 镜像构建
+├── docker-compose.yml     # Docker Compose 编排
+├── requirements.txt       # Python 依赖
+├── templates/
+│   └── index.html         # 前端页面
+├── static/                # 静态资源（CSS/JS/图片）
+└── data.db                # SQLite 数据库（自动生成）
+```
 
+## 注意事项
 
-# 运行
+- 端口 9000 必须对外开放，M1 设备通过 TCP 连接此端口
+- 数据库文件 `data.db` 需持久化挂载，避免容器重启丢失数据
+- 首次使用需让 M1 设备连接 WiFi（参考 EasyLink 教程）
+- 确保路由器 Hosts 正确配置，将 `aircat.phicomm.com` 指向本服务器
 
-  `chmod a+x ./run.sh`
+## License
 
-访问前端: http://YouIP:5000 
-
-# License
 [GPL-3.0](./LICENSE)
 
 [![OSCS Status](https://www.oscs1024.com/platform/badge/fenggenet/PhicommM1_Server.svg?size=small)](https://www.oscs1024.com/project/fenggenet/PhicommM1_Server?ref=badge_small)

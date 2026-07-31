@@ -1,0 +1,15 @@
+__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+.idea
+.vscode
+references
+preview
+*.md
+data.db
+data.db-wal
+data.db-shm
+logs/
+.trae/
