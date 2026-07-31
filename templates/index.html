@@ -27,7 +27,7 @@
                 <img src="{{ url_for('static',filename='images/head-face.png') }}" alt="">
                 <div class="name">
                     <p>悟空M1</p>
-                    <span>主卧室</span>
+                    <span>客厅</span>
                 </div>
             </div>
             <!-- 信息面板 -->
@@ -47,7 +47,7 @@
                         <span id="info_pm25">{{ info_pm25 }}</span><a>mg/m³</a>
                     </li>
                     <li>
-                        <p><i class="iconfont icon-jiachun"></i>甲醇</p>
+                        <p><i class="iconfont icon-jiachun"></i>甲醛</p>
                         <span id="info_hcho">{{ info_hcho }}</span><a>μg/m³</a>
                     </li>
                 </ul>
@@ -72,6 +72,12 @@
     var pm25 = new Array();
     var times = new Array();
     var now_id = "item1";
+
+    // 初始化数据
+    temperature.push("{{ info_temperature }}");
+    pm25.push("{{ info_pm25 }}");
+    times.push("{{ info_time }}".replace(/.*(\d{2}:\d{2}:\d{2}).*/, "$1"));
+
     function now_click(ob){
             now_id=$(ob).attr("id");
     }
@@ -100,18 +106,19 @@
                 if (times.length > 12){
                     times.shift();
                 }
+
+                // 更新图表数据
+                if (now_id == "item1"){
+                    $("#item1").click();
+                }
+                else{
+                    $("#item2").click();
+                }
 			},
 			error: function(){
 				$("#error_msg").text("GetData Error!");
 			}
 		})
-
-        if (now_id == "item1"){
-            $("#item1").click();
-        }
-        else{
-            $("#item2").click();
-        }
 	}
 </script>
 <script type="text/javascript">

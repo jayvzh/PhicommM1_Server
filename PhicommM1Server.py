@@ -4,20 +4,17 @@ import time
 import sys
 import json
 import re
-import mysql.connector
+import sqlite3
 import datetime
 import logging
 import os
 from common import function
 
-sqlHost = function.getConfig('sql.conf', 'mysql', 'HOSTNAME')
-sqlPort = function.getConfig('sql.conf', 'mysql', 'PORT')
-sqlUser = function.getConfig('sql.conf', 'mysql', 'USERNAME')
-sqlPasswd = function.getConfig('sql.conf', 'mysql', 'PASSWORD')
-sqlDatabase = function.getConfig('sql.conf', 'mysql', 'DATABASE')
-# 是否写入到MYSQL数据库,True写入,False不写入
+# SQLite数据库文件路径
+sqliteDbPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data.db')
+# 是否写入到SQLite数据库,True写入,False不写入
 isSql = True
-# 每隔多少获取信息,并写入MYSQL数据中,单位秒 	 
+# 每隔多少获取信息,并写入SQLite数据中,单位秒 	 
 time_sleep = 5
 
 
@@ -61,64 +58,58 @@ def get_data(conn, addr):
                 info_Humidity = cut(float(jsonData['humidity']), 1)  # 湿度
                 info_Temperature = cut(float(jsonData['temperature']), 1)  # 温度
                 info_PM25 = jsonData['value']  # PM2.5
-                info_HCHO = cut(float(jsonData['hcho']) / 1000, 2)  # 甲醇
+                info_HCHO = cut(float(jsonData['hcho']) / 1000, 2)  # 甲醛
                 if isSql:
-                    mysql_insert(timestamp2(), info_Humidity, info_Temperature, info_PM25, info_HCHO)
+                    sqlite_insert(timestamp2(), info_Humidity, info_Temperature, info_PM25, info_HCHO)
         # 等待指定时间,单位秒
         time.sleep(time_sleep)
 
 
-# 连接MYSQL
-def mysql_conn():
-    _log("MySql: Connecting...", 3)
+# 连接SQLite
+def sqlite_conn():
+    _log("SQLite: Connecting...", 3)
     try:
-        mydb = mysql.connector.connect(
-            host=sqlHost,
-            port=sqlPort,
-            user=sqlUser,
-            passwd=sqlPasswd,
-            database=sqlDatabase,
-            charset="utf8"
-        )
-        mycursor = mydb.cursor()
-        _log("MySql: Is connected.", 3)
+        conn = sqlite3.connect(sqliteDbPath)
+        cursor = conn.cursor()
+        _log("SQLite: Is connected.", 3)
         # 如果m1表不存在,则自动创建
         sql = """
 			create table if not exists m1(
-			id int auto_increment primary key,
-			time int,
-			humidity float,
-			temperature float,
-			pm25 float,
-			hcho float)
+			id integer primary key autoincrement,
+			time integer,
+			humidity real,
+			temperature real,
+			pm25 real,
+			hcho real)
 		"""
-        mycursor.execute(sql)
-        return mydb, mycursor
+        cursor.execute(sql)
+        return conn, cursor
     except Exception as err:
-        _log("MySql: Connection failed.", 2)
+        _log("SQLite: Connection failed.", 2)
+        _log(str(err), 2)
 
 
-# 关闭MYSQL连接
-def mysql_close(mydb, mycursor):
-    if mycursor:
-        mycursor.close()
-    if mydb:
-        mydb.close()
+# 关闭SQLite连接
+def sqlite_close(conn, cursor):
+    if cursor:
+        cursor.close()
+    if conn:
+        conn.close()
 
 
 # 插入记录,依次是 时间戳,湿度,温度,PM2.5,甲醇
-def mysql_insert(time, humidity, temperature, pm25, hcho):
+def sqlite_insert(time, humidity, temperature, pm25, hcho):
     try:
-        mydb, mycursor = mysql_conn()
-        _log("MySql: Writing data...", 3)
-        sql = "insert into m1(time,humidity,temperature,pm25,hcho) value (" + str(time) + "," + str(
-            humidity) + "," + str(temperature) + "," + str(pm25) + "," + str(hcho) + ")"
-        mycursor.execute(sql)
-        mydb.commit()
-        _log("MySql: Write data successfully.", 3)
+        conn, cursor = sqlite_conn()
+        _log("SQLite: Writing data...", 3)
+        sql = "insert into m1(time,humidity,temperature,pm25,hcho) values (?, ?, ?, ?, ?)"
+        cursor.execute(sql, (time, humidity, temperature, pm25, hcho))
+        conn.commit()
+        _log("SQLite: Write data successfully.", 3)
     except Exception as e:
-        _log("MySql: Failed to write data.", 2)
-    mysql_close(mydb, mycursor)
+        _log("SQLite: Failed to write data.", 2)
+        _log(str(e), 2)
+    sqlite_close(conn, cursor)
 
 
 # Json处理从M1取得的数据

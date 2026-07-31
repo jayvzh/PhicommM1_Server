@@ -1,47 +1,50 @@
 import datetime
 import pytz
+import sqlite3
+import os
 from flask import Flask, jsonify, render_template, url_for
-from sqlalchemy import create_engine
-from common import function
 
-# 数据库配置变量
-HOSTNAME = function.getConfig('sql.conf', 'mysql', 'HOSTNAME')
-PORT = function.getConfig('sql.conf', 'mysql', 'PORT')
-DATABASE = function.getConfig('sql.conf', 'mysql', 'DATABASE')
-USERNAME = function.getConfig('sql.conf', 'mysql', 'USERNAME')
-PASSWORD = function.getConfig('sql.conf', 'mysql', 'PASSWORD')
-DB_URI = 'mysql+pymysql://{}:{}@{}:{}/{}'.format(USERNAME, PASSWORD, HOSTNAME, PORT, DATABASE)
-# 创建数据库引擎
-engine = create_engine(DB_URI)
+# SQLite数据库文件路径
+SQLITE_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data.db')
 
 app = Flask(__name__)
 
 
 @app.route('/')
 def index():
-    with engine.connect() as conn:
-        rs = conn.execute('select * from m1 order by id DESC')
-    row = rs.fetchone()
+    conn = sqlite3.connect(SQLITE_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('select * from m1 order by id DESC')
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    
     return render_template(
         'index.html',
-        info_time=timestamp2string(row.time),
-        info_humidity=row.humidity,
-        info_temperature=row.temperature,
-        info_pm25=row.pm25,
-        info_hcho=row.hcho
+        info_time=timestamp2string(row['time']),
+        info_humidity=row['humidity'],
+        info_temperature=row['temperature'],
+        info_pm25=row['pm25'],
+        info_hcho=row['hcho']
     )
 
 
 @app.route('/getdata')
 def getdata():
-    with engine.connect() as conn:
-        rs = conn.execute('select * from m1 order by id DESC')
-    row = rs.fetchone()
-    info_time = timestamp2string(row.time)
-    info_humidity = str(row.humidity)
-    info_temperature = str(row.temperature)
-    info_pm25 = str(row.pm25)
-    info_hcho = str(row.hcho)
+    conn = sqlite3.connect(SQLITE_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('select * from m1 order by id DESC')
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    
+    info_time = timestamp2string(row['time'])
+    info_humidity = str(row['humidity'])
+    info_temperature = str(row['temperature'])
+    info_pm25 = str(row['pm25'])
+    info_hcho = str(row['hcho'])
     return jsonify(
         info_time=info_time,
         info_humidity=info_humidity,
