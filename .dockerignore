@@ -11,5 +11,6 @@ preview
 data.db
 data.db-wal
 data.db-shm
+data/
 logs/
 .trae/

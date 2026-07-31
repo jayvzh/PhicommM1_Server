@@ -11,7 +11,9 @@ import os
 
 # SQLite数据库文件路径
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'data.db')
+DATA_DIR = os.path.join(BASE_DIR, 'data')
+os.makedirs(DATA_DIR, exist_ok=True)
+DB_PATH = os.path.join(DATA_DIR, 'data.db')
 # 是否写入到SQLite数据库,True写入,False不写入
 isSql = True
 # 每隔多少获取信息,并写入SQLite数据中,单位秒

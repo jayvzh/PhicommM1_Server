@@ -129,6 +129,7 @@ dmypy.json
 .pyre/
 
 # Project runtime files
+data/
 data.db
 data.db-wal
 data.db-shm
