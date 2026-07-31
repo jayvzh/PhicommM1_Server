@@ -31,7 +31,7 @@ Flask 前端 (端口5000) <------ app.py ----------+
 ### 2. 启动服务
 
 ```bash
-git clone https://github.com/fenggenet/PhicommM1_Server.git
+git clone https://github.com/jayvzh/PhicommM1_Server.git
 cd PhicommM1_Server
 docker compose up -d
 ```
@@ -65,7 +65,7 @@ chmod +x run.sh
 ## API 接口
 
 | 端点 | 方法 | 说明 |
-|------|------|------|
+| --- | --- | --- |
 | `/` | GET | 前端页面 |
 | `/getdata` | GET | 获取最新传感器数据 |
 | `/api/history?hours=N` | GET | 获取最近 N 小时的历史数据 |
