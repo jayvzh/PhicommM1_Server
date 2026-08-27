@@ -69,19 +69,6 @@ cd PhicommM1_Server
 docker compose up -d --build
 ```
 
-## API 接口
-
-| 端点 | 方法 | 说明 |
-| --- | --- | --- |
-| `/` | GET | 前端页面 |
-| `/getdata` | GET | 获取最新传感器数据 |
-| `/api/history?hours=N` | GET | 获取最近 N 小时的历史数据 |
-| `/api/brightness` | GET | 获取当前亮度设置 |
-| `/api/brightness` | POST | 设置亮度：`{"value": 0}` (0/25/50) |
-| `/api/config` | GET | 获取系统配置 |
-| `/api/config` | POST | 更新配置：`{"retention_days": 7}` |
-| `/api/health` | GET | 健康检查 |
-
 ## 配置说明
 
 ### 数据保留

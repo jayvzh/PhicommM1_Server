@@ -35,14 +35,37 @@ def get_latest_reading():
     return row
 
 
-def get_current_brightness():
-    """获取当前亮度设置"""
+def get_config_value(key, default=None):
+    """读取 config 表中的一项配置"""
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT value FROM config WHERE key = 'brightness'")
+    cursor.execute('SELECT value FROM config WHERE key = ?', (key,))
     row = cursor.fetchone()
     conn.close()
-    return int(row['value']) if row else 50
+    return row['value'] if row else default
+
+
+def set_config_value(key, value):
+    """写入 config 表中的一项配置"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        'INSERT OR REPLACE INTO config(key, value) VALUES(?, ?)',
+        (key, str(value))
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_current_brightness():
+    """获取当前亮度设置"""
+    value = get_config_value('brightness', '50')
+    return int(value)
+
+
+def is_brightness_auto():
+    """是否处于自动亮度模式"""
+    return get_config_value('brightness_auto', '0') == '1'
 
 
 def get_retention_days():
@@ -65,16 +88,17 @@ def index():
             info_temperature='--',
             info_pm25='--',
             info_hcho='--',
-            info_brightness=50)
+            info_brightness=50,
+            info_brightness_auto=False)
 
-    brightness = get_current_brightness()
     return render_template('index.html',
         info_time=timestamp2string(row['time']),
         info_humidity=row['humidity'],
         info_temperature=row['temperature'],
         info_pm25=row['pm25'],
         info_hcho=row['hcho'],
-        info_brightness=brightness)
+        info_brightness=get_current_brightness(),
+        info_brightness_auto=is_brightness_auto())
 
 
 @app.route('/getdata')
@@ -137,33 +161,34 @@ def api_history():
 
 @app.route('/api/brightness', methods=['GET'])
 def api_brightness_get():
-    """获取当前亮度"""
-    brightness = get_current_brightness()
-    return jsonify(success=True, brightness=brightness)
+    """获取当前亮度和自动模式状态"""
+    return jsonify(success=True,
+                   brightness=get_current_brightness(),
+                   auto=is_brightness_auto())
 
 
 @app.route('/api/brightness', methods=['POST'])
 def api_brightness_post():
     """设置亮度
-    请求体: {"value": 50}
-    有效值: 0 (关), 25 (暗), 50 (标准)
+    请求体: {"value": 50} 或 {"value": "auto"}
+    固定档位: 0 (关), 25 (暗), 50 (标准); 选择固定档位即退出自动模式
+    "auto": 启用自动模式(北京时间 21:00 切暗, 06:00 切标准)
     """
     data = request.get_json(force=True)
     value = data.get('value', 50)
 
+    if value == 'auto':
+        set_config_value('brightness_auto', '1')
+        return jsonify(success=True, auto=True, brightness=get_current_brightness())
+
     if value not in (0, 25, 50):
-        return jsonify(success=False, error='Invalid brightness value. Must be 0, 25, or 50.'), 400
+        return jsonify(success=False, error='Invalid brightness value. Must be 0, 25, 50, or "auto".'), 400
 
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT OR REPLACE INTO config(key, value) VALUES('brightness', ?)",
-        (str(value),)
-    )
-    conn.commit()
-    conn.close()
+    # 选择固定档位:写入亮度并关闭自动模式
+    set_config_value('brightness', value)
+    set_config_value('brightness_auto', '0')
 
-    return jsonify(success=True, brightness=value)
+    return jsonify(success=True, auto=False, brightness=value)
 
 
 @app.route('/api/config', methods=['GET'])

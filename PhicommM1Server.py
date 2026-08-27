@@ -23,7 +23,15 @@ DEFAULT_RETENTION_DAYS = 7
 
 # 全局亮度状态(0=关, 25=暗, 50=标准)
 _brightness = 50
+# 自动亮度开关:开启后按北京时间 21:00 切暗(25)、06:00 切标准(50)
+_brightness_auto = False
 _brightness_lock = threading.Lock()
+
+# 自动模式的切换时间(北京时间,24小时制)
+AUTO_NIGHT_HOUR = 21   # 21:00 -> 暗
+AUTO_DAY_HOUR = 6      # 06:00 -> 标准
+AUTO_NIGHT_VALUE = 25
+AUTO_DAY_VALUE = 50
 
 
 def get_db():
@@ -61,6 +69,7 @@ def init_db():
     # 设置默认配置
     defaults = {
         'brightness': '50',
+        'brightness_auto': '0',
         'retention_days': str(DEFAULT_RETENTION_DAYS),
     }
     for key, value in defaults.items():
@@ -74,17 +83,18 @@ def init_db():
 
 
 def load_brightness():
-    """从数据库加载当前亮度设置"""
-    global _brightness
+    """从数据库加载当前亮度设置和自动模式开关"""
+    global _brightness, _brightness_auto
     try:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT value FROM config WHERE key = 'brightness'")
-        row = cursor.fetchone()
-        if row:
-            with _brightness_lock:
-                _brightness = int(row['value'])
+        cursor.execute("SELECT key, value FROM config WHERE key IN ('brightness', 'brightness_auto')")
+        rows = {r['key']: r['value'] for r in cursor.fetchall()}
         conn.close()
+        with _brightness_lock:
+            if 'brightness' in rows:
+                _brightness = int(rows['brightness'])
+            _brightness_auto = rows.get('brightness_auto', '0') == '1'
     except Exception as e:
         _log(f'Failed to load brightness: {e}', 2)
 
@@ -93,6 +103,50 @@ def get_brightness():
     """获取当前亮度值"""
     with _brightness_lock:
         return _brightness
+
+
+def is_brightness_auto():
+    """是否处于自动亮度模式"""
+    with _brightness_lock:
+        return _brightness_auto
+
+
+def auto_brightness_target():
+    """根据北京时间计算自动模式下应有的亮度
+    21:00(含) 至次日 06:00 前为夜间 -> 暗(25),其余时段 -> 标准(50)
+    """
+    hour = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).hour
+    if AUTO_NIGHT_HOUR <= hour or hour < AUTO_DAY_HOUR:
+        return AUTO_NIGHT_VALUE
+    return AUTO_DAY_VALUE
+
+
+def set_db_config(key, value):
+    """更新 config 表中的一项配置"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        'INSERT OR REPLACE INTO config(key, value) VALUES(?, ?)',
+        (key, str(value))
+    )
+    conn.commit()
+    conn.close()
+
+
+def auto_brightness_scheduler():
+    """自动亮度定时线程:每30秒检查一次,到点(或启动时)把亮度写入数据库"""
+    _log('Auto brightness scheduler started (21:00 -> dim, 06:00 -> standard, Beijing time).', 3)
+    while True:
+        try:
+            load_brightness()
+            if is_brightness_auto():
+                target = auto_brightness_target()
+                if get_brightness() != target:
+                    set_db_config('brightness', target)
+                    _log(f'Auto brightness: set to {target}', 0)
+        except Exception as e:
+            _log(f'Auto brightness scheduler error: {e}', 2)
+        time.sleep(30)
 
 
 def cleanup_old_data():
@@ -293,5 +347,9 @@ if __name__ == '__main__':
     # 启动数据清理后台线程
     cleanup_thread = threading.Thread(target=cleanup_scheduler, daemon=True)
     cleanup_thread.start()
+
+    # 启动自动亮度调度线程
+    auto_thread = threading.Thread(target=auto_brightness_scheduler, daemon=True)
+    auto_thread.start()
 
     socket_service()

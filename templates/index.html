@@ -153,12 +153,14 @@
             <div class="brightness-panel">
                 <div class="panel-title">屏幕亮度</div>
                 <div class="brightness-buttons">
-                    <button id="btn_bright_0" class="{% if info_brightness == 0 %}active{% endif %}"
+                    <button id="btn_bright_0" class="{% if not info_brightness_auto and info_brightness == 0 %}active{% endif %}"
                         onclick="setBrightness(0)">关闭</button>
-                    <button id="btn_bright_25" class="{% if info_brightness == 25 %}active{% endif %}"
+                    <button id="btn_bright_25" class="{% if not info_brightness_auto and info_brightness == 25 %}active{% endif %}"
                         onclick="setBrightness(25)">暗</button>
-                    <button id="btn_bright_50" class="{% if info_brightness == 50 %}active{% endif %}"
+                    <button id="btn_bright_50" class="{% if not info_brightness_auto and info_brightness == 50 %}active{% endif %}"
                         onclick="setBrightness(50)">标准</button>
+                    <button id="btn_bright_auto" class="{% if info_brightness_auto %}active{% endif %}"
+                        onclick="setBrightness('auto')" title="北京时间 21:00 切暗, 06:00 切标准">自动</button>
                 </div>
             </div>
 
