@@ -12,6 +12,11 @@ DB_PATH = os.path.join(DATA_DIR, 'data.db')
 app = Flask(__name__)
 
 
+@app.route('/favicon.ico')
+def favicon():
+    return app.send_static_file('favicon.ico')
+
+
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.execute('PRAGMA journal_mode=WAL')

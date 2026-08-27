@@ -13,9 +13,13 @@
   }
   setBodyFontSize();
 
-  // set 1rem = viewWidth / 10
+  // set 1rem = viewWidth / 7.5
   function setRemUnit () {
     var rem = docEl.clientWidth / 7.5
+    // PC宽屏下限制rem上限，内容保持手机端尺寸并居中显示
+    if (rem > 64) {
+      rem = 64
+    }
     docEl.style.fontSize = rem + 'px'
   }
 

@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>PhicommM1</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}" />
     <meta name="viewport"
-        content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no" />
+        content="width=device-width,initial-scale=1,minimum-scale=0.5,maximum-scale=5,user-scalable=yes" />
     <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='css/iconfont.css') }}" />
     <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='css/style.css') }}" />
     <script src="{{ url_for('static',filename='js/flexible.js') }}" type="text/javascript" charset="utf-8"></script>
@@ -15,7 +16,8 @@
     <style>
         .brightness-panel {
             width: 100%;
-            margin-top: .3rem;
+            margin-top: .35rem;
+            margin-bottom: .4rem;
             padding: .3rem;
             background: #F6FBF4;
             border-radius: .15rem;
@@ -112,34 +114,21 @@
                 <ul>
                     <li>
                         <p><i class="iconfont icon-wendu"></i>温度</p>
-                        <span id="info_temperature">{{ info_temperature }}</span><a>°C</a>
+                        <div class="value-row"><span id="info_temperature">{{ info_temperature }}</span><a>°C</a></div>
                     </li>
                     <li>
                         <p><i class="iconfont icon-youzhi"></i>湿度</p>
-                        <span id="info_humidity">{{ info_humidity }}</span><a>%</a>
+                        <div class="value-row"><span id="info_humidity">{{ info_humidity }}</span><a>%</a></div>
                     </li>
                     <li>
                         <p><i class="iconfont icon-jiaquan"></i>PM2.5</p>
-                        <span id="info_pm25">{{ info_pm25 }}</span><a>μg/m³</a>
+                        <div class="value-row"><span id="info_pm25">{{ info_pm25 }}</span><a>μg/m³</a></div>
                     </li>
                     <li>
                         <p><i class="iconfont icon-jiachun"></i>甲醛</p>
-                        <span id="info_hcho">{{ info_hcho }}</span><a>mg/m³</a>
+                        <div class="value-row"><span id="info_hcho">{{ info_hcho }}</span><a>mg/m³</a></div>
                     </li>
                 </ul>
-            </div>
-
-            <!-- 亮度控制 -->
-            <div class="brightness-panel">
-                <div class="panel-title">屏幕亮度</div>
-                <div class="brightness-buttons">
-                    <button id="btn_bright_0" class="{% if info_brightness == 0 %}active{% endif %}"
-                        onclick="setBrightness(0)">关闭</button>
-                    <button id="btn_bright_25" class="{% if info_brightness == 25 %}active{% endif %}"
-                        onclick="setBrightness(25)">暗</button>
-                    <button id="btn_bright_50" class="{% if info_brightness == 50 %}active{% endif %}"
-                        onclick="setBrightness(50)">标准</button>
-                </div>
             </div>
 
             <!-- 图表 -->
@@ -157,6 +146,19 @@
                     <button data-hours="6" onclick="loadHistory(6)">6小时</button>
                     <button data-hours="24" class="active" onclick="loadHistory(24)">24小时</button>
                     <button data-hours="168" onclick="loadHistory(168)">7天</button>
+                </div>
+            </div>
+
+            <!-- 亮度控制 -->
+            <div class="brightness-panel">
+                <div class="panel-title">屏幕亮度</div>
+                <div class="brightness-buttons">
+                    <button id="btn_bright_0" class="{% if info_brightness == 0 %}active{% endif %}"
+                        onclick="setBrightness(0)">关闭</button>
+                    <button id="btn_bright_25" class="{% if info_brightness == 25 %}active{% endif %}"
+                        onclick="setBrightness(25)">暗</button>
+                    <button id="btn_bright_50" class="{% if info_brightness == 50 %}active{% endif %}"
+                        onclick="setBrightness(50)">标准</button>
                 </div>
             </div>
 
@@ -199,6 +201,9 @@
                     trigger: 'axis',
                     axisPointer: { type: 'line' }
                 },
+                dataZoom: [
+                    { type: 'inside', start: 0, end: 100, filterMode: 'none', zoomOnMouseWheel: true, moveOnMouseMove: true }
+                ],
                 xAxis: [{
                     type: 'category',
                     boundaryGap: false,

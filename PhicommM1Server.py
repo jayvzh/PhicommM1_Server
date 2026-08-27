@@ -125,8 +125,12 @@ def cleanup_scheduler():
         cleanup_old_data()
 
 
-def build_heartbeat_msg(brightness):
-    """构建心跳消息,包含亮度控制
+# 心跳包(type=5),与参考实现 EasyPhicommM1 一致,用于维持设备长连接
+HEARTBEAT_MSG = b'\xaaO\x01%F\x119\x8f\x0b\x00\x00\x00\x00\x00\x00\x00\x00\xb0\xf8\x93\x11dR\x007\x00\x00\x02{"type":5,"status":1}\xff#END#'
+
+
+def build_brightness_msg(brightness):
+    """构建亮度控制消息(type=2)
     亮度值: 0=关, 25=暗, 50=标准
     """
     return (
@@ -162,11 +166,22 @@ def handle_client(conn, addr):
     _log(f'Client thread started for {addr}', 3)
     # 设置socket超时,防止设备断开不发送FIN包时recv永久阻塞
     conn.settimeout(time_sleep * 2)
+    # last_brightness 记录最近一次已下发的亮度,None 表示连接后尚未同步过
+    last_brightness = None
     try:
         while True:
+            # 心跳包:维持长连接,与参考实现一致
+            conn.sendall(HEARTBEAT_MSG)
+
+            # 每轮从数据库刷新亮度,网页修改后最长 time_sleep 秒内同步到设备
+            load_brightness()
             brightness = get_brightness()
-            heartbeat = build_heartbeat_msg(brightness)
-            conn.sendall(heartbeat)
+
+            # 亮度变化时(或连接后首次)下发亮度控制包
+            if brightness != last_brightness:
+                conn.sendall(build_brightness_msg(brightness))
+                last_brightness = brightness
+                _log(f'Brightness set to {brightness} for {addr}', 0)
 
             try:
                 data = conn.recv(1024)

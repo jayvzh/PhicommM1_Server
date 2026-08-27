@@ -113,6 +113,10 @@ curl -X POST http://localhost:5000/api/brightness \
 - 首次使用需让 M1 设备连接 WiFi（参考 EasyLink 教程）
 - 确保路由器 Hosts 正确配置，将 `aircat.phicomm.com` 指向本服务器
 
+## 感谢
+- [fenggenet / PhicommM1_Server](https://github.com/fenggenet/PhicommM1_Server)
+- [DreamNya / EasyPhicommM1](https://github.com/DreamNya/EasyPhicommM1)
+
 ## License
 
 [GPL-3.0](./LICENSE)
