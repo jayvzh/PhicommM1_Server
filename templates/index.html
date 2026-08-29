@@ -186,38 +186,59 @@
             updateChart();
         }
 
+        function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+
+        // 时间轴刻度标签：24小时内只显示时分，跨天显示月日+时分
+        function formatAxisLabel(ts) {
+            var d = new Date(ts);
+            var hm = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+            if (currentHours > 24) {
+                return (d.getMonth() + 1) + '/' + d.getDate() + '\n' + hm;
+            }
+            return hm;
+        }
+
+        // tooltip 显示完整时间
+        function formatTooltipTime(ts) {
+            var d = new Date(ts);
+            return (d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' '
+                + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+        }
+
         function updateChart() {
             if (!chart) return;
             var cfg = metricConfig[currentMetric];
 
-            var times = historyData.map(function (d) {
-                return d.time_str.substring(11);
-            });
-            var values = historyData.map(function (d) {
-                return d[cfg.field];
+            // [毫秒时间戳, 数值]，配合 time 类型 X 轴，正确体现跨天与数据断点
+            var points = historyData.map(function (d) {
+                return [d.time * 1000, d[cfg.field]];
             });
 
             chart.setOption({
                 grid: { top: 45, bottom: 5, left: 40, right: 18, containLabel: true },
                 tooltip: {
                     trigger: 'axis',
-                    axisPointer: { type: 'line' }
+                    axisPointer: { type: 'line' },
+                    formatter: function (params) {
+                        var p = params[0];
+                        return formatTooltipTime(p.value[0]) + '<br/>'
+                            + cfg.name + ': ' + p.value[1] + ' ' + cfg.unit;
+                    }
                 },
                 dataZoom: [
                     { type: 'inside', start: 0, end: 100, filterMode: 'none', zoomOnMouseWheel: true, moveOnMouseMove: true }
                 ],
                 xAxis: [{
-                    type: 'category',
+                    type: 'time',
                     boundaryGap: false,
                     axisLabel: {
-                        formatter: '{value}',
+                        formatter: formatAxisLabel,
                         fontSize: 10,
                         color: '#bfbfbf'
                     },
                     axisLine: { lineStyle: { color: '#e9e9e9' } },
                     splitLine: { show: true, lineStyle: { color: '#f7f7f7' } },
-                    axisTick: { show: false },
-                    data: times
+                    axisTick: { show: false }
                 }],
                 yAxis: [{
                     boundaryGap: false,
@@ -243,7 +264,7 @@
                             ])
                         }
                     },
-                    data: values
+                    data: points
                 }]
             });
         }

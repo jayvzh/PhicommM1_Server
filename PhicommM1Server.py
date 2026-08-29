@@ -16,8 +16,10 @@ os.makedirs(DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(DATA_DIR, 'data.db')
 # 是否写入到SQLite数据库,True写入,False不写入
 isSql = True
-# 每隔多少获取信息,并写入SQLite数据中,单位秒
+# 每隔多少秒与设备交互一次(心跳/接收数据),用于维持长连接
 time_sleep = 5
+# 每隔多少秒写入一条数据到SQLite(存储降频,展示层1分钟精度足够)
+store_interval = 60
 # 数据保留天数(默认7天)
 DEFAULT_RETENTION_DAYS = 7
 
@@ -171,6 +173,38 @@ def cleanup_old_data():
         _log(f'Failed to cleanup old data: {e}', 2)
 
 
+def migrate_to_minute_data():
+    """将旧版5秒级高频数据按分钟去重,每个分钟桶只保留最早一条
+    幂等:60秒级新数据各自独占一个分钟桶,再次执行不会误删
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM m1')
+        total = cursor.fetchone()[0]
+        if total == 0:
+            conn.close()
+            return
+        cursor.execute('''
+            DELETE FROM m1
+            WHERE id NOT IN (
+                SELECT MIN(id) FROM m1 GROUP BY (time / 60) * 60
+            )
+        ''')
+        deleted = cursor.rowcount
+        conn.commit()
+        conn.close()
+
+        if deleted > 0:
+            _log(f'Migrated old data: removed {deleted} high-frequency records, kept {total - deleted} (one per minute).', 0)
+            # 回收删除后的磁盘空间
+            conn = get_db()
+            conn.execute('VACUUM')
+            conn.close()
+    except Exception as e:
+        _log(f'Failed to migrate old data: {e}', 2)
+
+
 def cleanup_scheduler():
     """定时清理线程,每小时执行一次"""
     _log('Cleanup scheduler started (runs every hour).', 3)
@@ -222,6 +256,8 @@ def handle_client(conn, addr):
     conn.settimeout(time_sleep * 2)
     # last_brightness 记录最近一次已下发的亮度,None 表示连接后尚未同步过
     last_brightness = None
+    # last_store_ts 上次入库时间戳,按 store_interval 节流入库(每连接独立)
+    last_store_ts = 0
     try:
         while True:
             # 心跳包:维持长连接,与参考实现一致
@@ -260,7 +296,11 @@ def handle_client(conn, addr):
                 info_PM25 = jsonData['value']
                 info_HCHO = cut(float(jsonData['hcho']) / 1000, 2)
                 if isSql:
-                    sqlite_insert(timestamp2(), info_Humidity, info_Temperature, info_PM25, info_HCHO)
+                    now_ts = timestamp2()
+                    # 距上次入库不足 store_interval 秒则跳过,只保留最新数据
+                    if now_ts - last_store_ts >= store_interval:
+                        last_store_ts = now_ts
+                        sqlite_insert(now_ts, info_Humidity, info_Temperature, info_PM25, info_HCHO)
 
             time.sleep(time_sleep)
     except Exception as e:
@@ -342,6 +382,7 @@ def _log(str, level):
 if __name__ == '__main__':
     _log('Starting Phicomm M1 Server...', 0)
     init_db()
+    migrate_to_minute_data()
     load_brightness()
 
     # 启动数据清理后台线程

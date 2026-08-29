@@ -133,14 +133,35 @@ def api_history():
         hours = request.args.get('hours', 24, type=int)
     except (ValueError, TypeError):
         hours = 24
+    if hours < 1:
+        hours = 24
 
-    since = int(datetime.datetime.now().timestamp()) - (hours * 3600)
+    now = int(datetime.datetime.now().timestamp())
+    since = now - (hours * 3600)
+
+    # 降采样：按时间范围选择聚合桶大小，避免一次返回过多数据
+    if hours <= 6:
+        bucket = 60      # 1~6小时: 1分钟/点，最多360点
+    elif hours <= 24:
+        bucket = 300     # 24小时: 5分钟/点，约288点
+    elif hours <= 72:
+        bucket = 300     # 3天: 5分钟/点，约864点
+    else:
+        bucket = 1200    # 7天: 20分钟/点，约504点
 
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        'SELECT time, humidity, temperature, pm25, hcho FROM m1 WHERE time >= ? ORDER BY time ASC',
-        (since,)
+        '''SELECT (time / ?) * ? AS bucket_time,
+                  AVG(humidity) AS humidity,
+                  AVG(temperature) AS temperature,
+                  AVG(pm25) AS pm25,
+                  AVG(hcho) AS hcho
+           FROM m1
+           WHERE time >= ?
+           GROUP BY bucket_time
+           ORDER BY bucket_time ASC''',
+        (bucket, bucket, since)
     )
     rows = cursor.fetchall()
     conn.close()
@@ -148,12 +169,12 @@ def api_history():
     data = []
     for row in rows:
         data.append({
-            'time': row['time'],
-            'time_str': timestamp2string(row['time']),
-            'humidity': row['humidity'],
-            'temperature': row['temperature'],
-            'pm25': row['pm25'],
-            'hcho': row['hcho'],
+            'time': row['bucket_time'],
+            'time_str': timestamp2string(row['bucket_time']),
+            'humidity': round(row['humidity'], 1),
+            'temperature': round(row['temperature'], 1),
+            'pm25': round(row['pm25'], 1),
+            'hcho': round(row['hcho'], 2),
         })
 
     return jsonify(success=True, count=len(data), data=data)

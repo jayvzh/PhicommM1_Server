@@ -1,8 +1,10 @@
-FROM python:3.11-slim
+FROM python:3.11-alpine
 
 WORKDIR /app
 
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+# tzdata: 供 TZ=Asia/Shanghai 生效
+RUN apk add --no-cache tzdata \
+    && pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
