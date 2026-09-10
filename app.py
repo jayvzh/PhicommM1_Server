@@ -1,4 +1,5 @@
 import datetime
+import logging
 import pytz
 import sqlite3
 import os
@@ -135,6 +136,9 @@ def api_history():
         hours = 24
     if hours < 1:
         hours = 24
+    # 限制最大查询范围,防止异常大值触发全表聚合
+    if hours > 720:
+        hours = 720
 
     now = int(datetime.datetime.now().timestamp())
     since = now - (hours * 3600)
@@ -275,4 +279,6 @@ def timestamp2string(timestamp):
 
 
 if __name__ == '__main__':
+    # 前端每5秒轮询 /getdata, 关闭 werkzeug 每请求访问日志, 防止容器 stdout 日志无限增长
+    logging.getLogger('werkzeug').setLevel(logging.WARNING)
     app.run(debug=False, host='0.0.0.0', port=5000)

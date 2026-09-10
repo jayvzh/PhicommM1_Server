@@ -7,6 +7,7 @@ import re
 import sqlite3
 import datetime
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 
 # SQLite数据库文件路径
@@ -60,6 +61,9 @@ def init_db():
             hcho real
         )
     ''')
+
+    # 历史查询(WHERE time >= ?)与定时清理(WHERE time < ?)都按 time 过滤,加索引避免全表扫描
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_m1_time ON m1(time)')
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS config(
@@ -228,6 +232,11 @@ def build_brightness_msg(brightness):
     )
 
 
+# 并发客户端连接上限,防止连接风暴(设备异常重连/端口扫描)拖垮进程
+MAX_CLIENTS = 16
+_client_slots = threading.BoundedSemaphore(MAX_CLIENTS)
+
+
 def socket_service():
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -242,11 +251,23 @@ def socket_service():
     while True:
         try:
             conn, addr = s.accept()
-            _log(f'New connection from {addr}', 0)
-            t = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
-            t.start()
         except Exception as e:
+            # 必须退避,否则异常时(如 fd 耗尽)此循环会全速自旋疯狂写日志
             _log(f'Accept error: {e}', 2)
+            time.sleep(1)
+            continue
+
+        if not _client_slots.acquire(blocking=False):
+            _log(f'Too many clients (max {MAX_CLIENTS}), rejecting {addr}', 1)
+            try:
+                conn.close()
+            except Exception:
+                pass
+            continue
+
+        _log(f'New connection from {addr}', 0)
+        t = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
+        t.start()
 
 
 def handle_client(conn, addr):
@@ -290,22 +311,27 @@ def handle_client(conn, addr):
             _log(f'Get M1 data: {jsonData}', 3)
 
             if jsonData is not None:
-                print(jsonData)
-                info_Humidity = cut(float(jsonData['humidity']), 1)
-                info_Temperature = cut(float(jsonData['temperature']), 1)
-                info_PM25 = jsonData['value']
-                info_HCHO = cut(float(jsonData['hcho']) / 1000, 2)
-                if isSql:
-                    now_ts = timestamp2()
-                    # 距上次入库不足 store_interval 秒则跳过,只保留最新数据
-                    if now_ts - last_store_ts >= store_interval:
-                        last_store_ts = now_ts
-                        sqlite_insert(now_ts, info_Humidity, info_Temperature, info_PM25, info_HCHO)
+                try:
+                    info_Humidity = cut(float(jsonData['humidity']), 1)
+                    info_Temperature = cut(float(jsonData['temperature']), 1)
+                    info_PM25 = jsonData['value']
+                    info_HCHO = cut(float(jsonData['hcho']) / 1000, 2)
+                except (KeyError, ValueError, TypeError):
+                    # 字段缺失或非法不入库,防止垃圾连接污染数据库
+                    _log(f'Invalid data from {addr}, skipped: {jsonData}', 1)
+                else:
+                    if isSql:
+                        now_ts = timestamp2()
+                        # 距上次入库不足 store_interval 秒则跳过,只保留最新数据
+                        if now_ts - last_store_ts >= store_interval:
+                            last_store_ts = now_ts
+                            sqlite_insert(now_ts, info_Humidity, info_Temperature, info_PM25, info_HCHO)
 
             time.sleep(time_sleep)
     except Exception as e:
         _log(f'Client {addr} error: {e}', 2)
     finally:
+        _client_slots.release()
         try:
             conn.close()
         except Exception:
@@ -350,25 +376,36 @@ def cut(num, c):
     return str(str_num[:str_num.index('.') + 1 + c])
 
 
+# ---------- 日志配置 ----------
+#   LOG_LEVEL: 日志级别(DEBUG/INFO/WARNING/ERROR), 默认 INFO(高频报文日志为 DEBUG, 默认不输出)
+#   单个日志文件上限 5MB, 最多保留 3 个历史文件, 硬上限约 20MB, 不会撑爆磁盘
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
+LOG_MAX_BYTES = 5 * 1024 * 1024
+LOG_BACKUP_COUNT = 3
+
+logger = logging.getLogger('PhicommM1 Server')
+logger.setLevel(logging.DEBUG)
+_log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s : %(message)s')
+
+_ls = logging.StreamHandler()
+_ls.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+_ls.setFormatter(_log_formatter)
+logger.addHandler(_ls)
+
+_logdir = os.path.join(BASE_DIR, 'logs')
+os.makedirs(_logdir, exist_ok=True)
+_lf = RotatingFileHandler(
+    filename=os.path.join(_logdir, 'm1-server.log'),
+    maxBytes=LOG_MAX_BYTES,
+    backupCount=LOG_BACKUP_COUNT,
+    encoding='utf8',
+)
+_lf.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+_lf.setFormatter(_log_formatter)
+logger.addHandler(_lf)
+
+
 def _log(str, level):
-    logger = logging.getLogger('PhicommM1 Server')
-    logger.setLevel(logging.DEBUG)
-    if not logger.handlers:
-        ls = logging.StreamHandler()
-        ls.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s : %(message)s')
-        ls.setFormatter(formatter)
-        logger.addHandler(ls)
-
-        logdir = os.path.join(BASE_DIR, 'logs')
-        if not os.path.exists(logdir):
-            os.makedirs(logdir, exist_ok=True)
-        logfile = os.path.join(logdir, time.strftime('%Y-%m-%d') + '.log')
-        lf = logging.FileHandler(filename=logfile, encoding='utf8')
-        lf.setLevel(logging.DEBUG)
-        lf.setFormatter(formatter)
-        logger.addHandler(lf)
-
     if level == 0:
         logger.info(str)
     elif level == 1:

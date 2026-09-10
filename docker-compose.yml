@@ -9,6 +9,12 @@ services:
       - ./data:/app/data       # 持久化数据库
       - ./logs:/app/logs       # 持久化日志
     restart: unless-stopped
+    # 限制容器 stdout 日志大小(docker 默认不限制,会无限增长直到占满磁盘)
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
       interval: 30s
