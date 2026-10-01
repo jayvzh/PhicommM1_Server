@@ -9,10 +9,13 @@
     <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='css/iconfont.css') }}" />
     <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='css/style.css') }}" />
     <script src="{{ url_for('static',filename='js/flexible.js') }}" type="text/javascript" charset="utf-8"></script>
-    <script src="{{ url_for('static',filename='js/vue.min.js') }}" type="text/javascript" charset="utf-8"></script>
-    <script src="{{ url_for('static',filename='js/echarts.min.js') }}" type="text/javascript" charset="utf-8"></script>
+    <script src="https://registry.npmmirror.com/vue/2.7.16/files/dist/vue.min.js" integrity="sha384-YVYXhPGIH/Gmcr0W5Rin4PcpcsG1a4pcdUUod1CnbDEJut7XiUaJtSlNKeRLJBPk" crossorigin="anonymous"></script>
+    <script>window.Vue || document.write('<script src="{{ url_for('static',filename='js/vue.min.js') }}"><\/script>')</script>
+    <script src="https://registry.npmmirror.com/echarts/5.5.1/files/dist/echarts.min.js" integrity="sha384-Mx5lkUEQPM1pOJCwFtUICyX45KNojXbkWdYhkKUKsbv391mavbfoAmONbzkgYPzR" crossorigin="anonymous"></script>
+    <script>window.echarts || document.write('<script src="{{ url_for('static',filename='js/echarts.min.js') }}"><\/script>')</script>
     <script src="{{ url_for('static',filename='js/layer_mobile/layer.js') }}" type="text/javascript" charset="utf-8"></script>
-    <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+    <script src="https://registry.npmmirror.com/jquery/3.7.1/files/dist/jquery.min.js" integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
+    <script>window.jQuery || document.write('<script src="{{ url_for('static',filename='js/jquery.min.js') }}"><\/script>')</script>
     <style>
         .brightness-panel {
             width: 100%;
@@ -255,14 +258,12 @@
                     showSymbol: false,
                     symbolSize: 5,
                     itemStyle: { color: cfg.color },
-                    lineStyle: { normal: { width: 2, color: cfg.color } },
+                    lineStyle: { width: 2, color: cfg.color },
                     areaStyle: {
-                        normal: {
-                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                                { offset: 0, color: cfg.color },
-                                { offset: 0.8, color: '#f6f6f8' }
-                            ])
-                        }
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: cfg.color },
+                            { offset: 0.8, color: '#f6f6f8' }
+                        ])
                     },
                     data: points
                 }]
